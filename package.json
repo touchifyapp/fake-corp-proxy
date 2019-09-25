@@ -2,18 +2,22 @@
   "name": "fake-corp-proxy",
   "version": "1.0.0",
   "description": "Fake proxy to test proxying in applications.",
+  "repository": {
+    "url": "https://github.com/touchifyapp/fake-corp-proxy.git",
+    "type": "git+https"
+  },
   "author": "Touchify (dev@touchify.co)",
   "license": "MIT",
   "main": "index.js",
   "bin": {
-    "fake-proxy": "./bin/fake-corp-proxy.js"
+    "fake-corp-proxy": "./bin/fake-corp-proxy.js"
   },
   "scripts": {
     "clean": "rimraf *.{js,d.ts} {lib,bin}/*.{js,d.ts}",
     "prepare": "tsc -p .",
     "watch": "ts-node-dev bin/fake-corp-proxy.ts",
     "start": "npm run prepare && node bin/fake-corp-proxy.js",
-    "test:http": "curl -x \"http://username:password@localhost:8080\" http://cdn.touchify.co/docs/windows/index.html",
+    "test:http": "curl -x \"http://username:password@localhost:8080\" http://www.google.com/",
     "test:https": "curl --proxy-insecure -x \"https://username:password@localhost:8081\" https://www.google.com/",
     "prepublishOnly": "npm run prepare -- --declaration",
     "postversion": "git push && git push --tags"
@@ -21,6 +25,16 @@
   "files": [
     "**/*.js",
     "**/*.d.ts"
+  ],
+  "keywords": [
+    "proxy",
+    "cli",
+    "http",
+    "https",
+    "authentication",
+    "basic",
+    "ntlm",
+    "corporate"
   ],
   "dependencies": {
     "express": "^4.17.1",

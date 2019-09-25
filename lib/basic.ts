@@ -44,7 +44,7 @@ function handleAuthenticate(req: IncomingMessage, res: ResponseOrSocket, next: F
         return write(req, res, 403).then(() => false);
     }
 
-    logger.verbose("BASIC> Authentication successful", JSON.stringify(userData));
+    logger.verbose(`BASIC> Authentication successful: ${user}:${password}`);
 
     next();
     return Promise.resolve(true);

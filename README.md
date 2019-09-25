@@ -1,6 +1,6 @@
 # fake-corp-proxy
 
-A [Node.js](https://nodejs.org) module and command-line utility to start a fake proxy server with Basic and NTLM fake authentication.
+A [Node.js](https://nodejs.org) module and command-line utility to start a fake HTTP(S) Forwrard-Proxy server with Basic or NTLM fake authentication.
 
 ## Installation
 

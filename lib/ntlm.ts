@@ -68,7 +68,7 @@ function handleAuthenticate(req: IncomingMessage, res: ResponseOrSocket, next: F
         return write(req, res, 403).then(() => false);
     }
 
-    logger.verbose("NTLM> Authentication successful", JSON.stringify(userData));
+    logger.verbose(`NTLM> Authentication successful: ${domain}\\${user} (${workstation})`);
 
     next();
     return Promise.resolve(true);
