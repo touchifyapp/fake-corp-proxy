@@ -1,0 +1,36 @@
+{
+  "name": "fake-corp-proxy",
+  "version": "1.0.0",
+  "description": "Fake proxy to test proxying in applications.",
+  "author": "Touchify (dev@touchify.co)",
+  "license": "MIT",
+  "main": "index.js",
+  "bin": {
+    "fake-proxy": "./bin/fake-corp-proxy.js"
+  },
+  "scripts": {
+    "prepare": "tsc -p .",
+    "watch": "ts-node-dev bin/fake-corp-proxy.ts",
+    "start": "npm run prepare && node bin/fake-corp-proxy.js",
+    "test:http": "http_proxy=\"http://username:password@localhost:8080\" curl http://cdn.touchify.co/docs/windows/index.html",
+    "test:https": "https_proxy=\"https://username:password@localhost:8080\" curl https://www.google.fr",
+    "prepublishOnly": "npm run prepare -- --declaration",
+    "postversion": "git push && git push --tags"
+  },
+  "files": [
+    "**/*.js",
+    "**/*.d.ts"
+  ],
+  "dependencies": {
+    "express": "^4.17.1",
+    "http-proxy": "^1.18.0",
+    "yargs": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.1",
+    "@types/http-proxy": "^1.17.0",
+    "@types/yargs": "^13.0.2",
+    "ts-node-dev": "^1.0.0-pre.43",
+    "typescript": "^3.6.3"
+  }
+}
