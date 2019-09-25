@@ -45,6 +45,20 @@ const argv = yargs
         type: "string"
     })
 
+    .option("verbose", {
+        describe: "Enable Verbose logging",
+        alias: "v",
+        type: "boolean",
+        default: false
+    })
+
+    .option("silent", {
+        describe: "Silent any logs",
+        alias: "S",
+        type: "boolean",
+        default: false
+    })
+
     .help()
     .alias("h", "help")
 

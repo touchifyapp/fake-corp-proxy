@@ -1,53 +1,53 @@
 import {
-    Request,
-    Response
-} from "express";
+    IncomingMessage,
+    ResponseOrSocket,
+    write
+} from "./util";
 
-export function handleBasic(req: Request, res: Response, next: Function): void {
+import {
+    Logger
+} from "./logger";
+
+export function handleBasic(req: IncomingMessage, res: ResponseOrSocket, next: Function, logger: Logger): Promise<boolean> {
     const authHeader = req.headers["proxy-authorization"];
     if (!authHeader) {
-        console.log(`Got unauthenticated request: ${req.method} ${req.url}, returning 407!`);
-
-        res.status(407)
-            .header("Proxy-Authenticate", "Basic")
-            .send();
-
-        return;
+        logger.verbose(`BASIC> Error 407: Got unauthenticated request: ${req.method} ${req.url}`);
+        return write(req, res, 407, { "Proxy-Authenticate": "Basic" }).then(() => false);
     }
 
     const authData = decodeBasicAuthorizationHeader(authHeader);
     if (!authData) {
-        console.log("Error 400: Proxy-Authorization header not valid", req.headers);
-        res.status(400).send();
-        return;
+        logger.verbose("BASIC> Error 400: Proxy-Authorization header invalid or not present", req.headers);
+        return write(req, res, 400).then(() => false);
     }
 
-    handleAuthenticate(req, res, next, authData);
+    return handleAuthenticate(req, res, next, logger, authData);
 }
 
-function handleAuthenticate(req: Request, res: Response, next: Function, [user, password]: [string, string]): void {
-    if (user !== "username" || password !== "password") {
-        res.status(403).send();
-        return;
+function handleAuthenticate(req: IncomingMessage, res: ResponseOrSocket, next: Function, logger: Logger, [user, password]: [string, string]): Promise<boolean> {
+    if (!user || !password) {
+        logger.verbose("BASIC> Error 403: Missing username or password");
+        return write(req, res, 403).then(() => false);
     }
-
-    // if we were going to do proper authentication, here"s where it would happen.
-    const authenticated = !user.startsWith("unauth");
 
     const userData = {
         user,
-        authenticated
+        password,
+        authenticated: !user.startsWith("unknown")
     };
 
     (req as any).basic = userData;
     (req as any).connection.basic = userData;
 
-    if (!authenticated) {
-        res.status(403).send();
-        return;
+    if (!userData.authenticated) {
+        logger.verbose(`BASIC> Error 403: Unknown user: ${user}`);
+        return write(req, res, 403).then(() => false);
     }
 
-    return next();
+    logger.verbose("BASIC> Authentication successful", JSON.stringify(userData));
+
+    next();
+    return Promise.resolve(true);
 }
 
 function decodeBasicAuthorizationHeader(header: string): [string, string] | undefined {

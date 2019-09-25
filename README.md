@@ -38,7 +38,7 @@ Options:
   -h, --help         Show help                                         [boolean]
 ```
 
-## Module Options
+## Module usage
 
 Simple usage:
 
@@ -56,6 +56,53 @@ server.close();
 ```
 
 *Note: The same options as CLI are available"
+
+## Simulate Authentication errors
+
+This module does not really authenticate users.
+To simulate an unauthorized user, just use a username starting with `unknwown`.
+(eg: `unkwnown`, `unkwnown-user`, `unkwnown-test`)
+
+```bash
+curl --proxy-insecure -x \"https://unknown:password@localhost:8081\" https://www.google.com/
+```
+
+## Exemples
+
+Forward-Proxy for HTTP only:
+```bash
+fake-corp-proxy
+```
+
+Forward-Proxy for HTTP and HTTPS:
+```bash
+fake-corp-proxy --https --key certs/server.key --cert certs/server.crt
+```
+
+Forward-Proxy for HTTP and HTTPS with Basic authentication:
+```bash
+fake-corp-proxy --https --key certs/server.key --cert certs/server.crt --basic
+```
+
+Forward-Proxy for HTTP and HTTPS with NTLM authentication:
+```bash
+fake-corp-proxy --https --key certs/server.key --cert certs/server.crt --ntlm
+```
+
+Forward-Proxy for HTTP and HTTPS with NTLM authentication and verbose logging (details of authentication):
+```bash
+fake-corp-proxy --https --key certs/server.key --cert certs/server.crt --ntlm --verbose
+```
+
+## Generate your SSL certificates
+
+To generate self-signed certificates for your proxy, run:
+
+```bash
+openssl req -nodes -new -x509 -keyout server.key -out server.crt
+```
+
+Then you have to trust the server.crt in your OS to allow proxy validation.
 
 ## License
 

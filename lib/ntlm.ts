@@ -1,80 +1,77 @@
 import {
-    Request,
-    Response
-} from "express";
+    IncomingMessage,
+    ResponseOrSocket,
+    write
+} from "./util";
 
-export function handleNtlm(req: Request, res: Response, next: Function): void {
+import {
+    Logger
+} from "./logger";
+
+export function handleNtlm(req: IncomingMessage, res: ResponseOrSocket, next: Function, logger: Logger): Promise<boolean> {
     const authHeaders = req.headers["proxy-authorization"];
     if (!authHeaders) {
-        console.log(`Got unauthenticated request: ${req.method} ${req.url}, returning 407!`);
-
-        res.status(407)
-            .header("Proxy-Authenticate", "NTLM")
-            .send();
-
-        return;
+        logger.verbose(`NTLM> Error 407: Got unauthenticated request: ${req.method} ${req.url}`);
+        return write(req, res, 407, { "Proxy-Authenticate": "NTLM" }).then(() => false);
     }
 
     const authData = decodeHttpAuthorizationHeader(authHeaders);
     if (!authData) {
-        console.log("Error 400: Proxy-Authorization header not present", req.headers);
-        res.status(400).send();
-        return;
+        logger.verbose("NTLM> Error 400: Proxy-Authorization header invalid or not present:", req.headers);
+        return write(req, res, 400).then(() => false);
     }
 
     try {
-        const message_type = decodeMessageType(authData[1]);
+        const messageType = decodeMessageType(authData[1]);
 
-        switch (message_type) {
+        switch (messageType) {
             case 1:
-                console.log(`Received NEGOTIATE: Proxy-Authorization: ${authHeaders}`);
+                logger.verbose(`NTLM> Received NEGOTIATE: Proxy-Authorization: ${authHeaders}`);
                 return handleNegotiate(req, res);
 
             case 3:
-                console.log(`Received AUTHENTICATE: Proxy-Authorization: ${authHeaders}`);
-                return handleAuthenticate(req, res, next, authData[1]);
+                logger.verbose(`NTLM> Received AUTHENTICATE: Proxy-Authorization: ${authHeaders}`);
+                return handleAuthenticate(req, res, next, logger, authData[1]);
         }
 
-        console.log("Error 400: Unknown authorization message type", req);
-        res.status(400).send();
+        logger.verbose(`NTLM> Error 400: Unknown authorization message type: ${messageType}`);
+        return write(req, res, 400).then(() => false);
     }
     catch (err) {
-        console.log("Error 400:", err);
-        res.status(400).send();
+        logger.verbose("NTLM> Error 400:", err);
+        return write(req, res, 400).then(() => false);
     }
 }
 
 
-function handleNegotiate(req: Request, res: Response): void {
+function handleNegotiate(req: IncomingMessage, res: ResponseOrSocket): Promise<boolean> {
     const challenge = fakeNtlmChallenge();
 
-    res.status(407)
-        .header("Proxy-Authenticate", "NTLM " + challenge.toString("base64"))
-        .send();
+    return write(req, res, 407, { "Proxy-Authenticate": "NTLM " + challenge.toString("base64") }).then(() => false);
 }
 
-function handleAuthenticate(req: Request, res: Response, next: Function, ntlmMessage: Buffer): void {
+function handleAuthenticate(req: IncomingMessage, res: ResponseOrSocket, next: Function, logger: Logger, ntlmMessage: Buffer): Promise<boolean> {
     const [user, domain, workstation] = parseNtlmAuthenticate(ntlmMessage);
-
-    // if we were going to do proper authentication, here"s where it would happen.
-    const authenticated = !user.startsWith("unauth");
 
     const userData = {
         domain,
         user,
         workstation,
-        authenticated
+        authenticated: !user.startsWith("unknown")
     };
 
     (req as any).ntlm = userData;
     (req as any).connection.ntlm = userData;
 
-    if (!authenticated) {
-        res.status(403).send();
-        return;
+    if (!userData.authenticated) {
+        logger.verbose(`NTLM> Error 403: Unknown user: ${domain}\\${user} (${workstation})`);
+        return write(req, res, 403).then(() => false);
     }
 
-    return next();
+    logger.verbose("NTLM> Authentication successful", JSON.stringify(userData));
+
+    next();
+    return Promise.resolve(true);
 }
 
 

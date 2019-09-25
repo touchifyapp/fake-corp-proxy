@@ -9,11 +9,12 @@
     "fake-proxy": "./bin/fake-corp-proxy.js"
   },
   "scripts": {
+    "clean": "rimraf *.{js,d.ts} {lib,bin}/*.{js,d.ts}",
     "prepare": "tsc -p .",
     "watch": "ts-node-dev bin/fake-corp-proxy.ts",
     "start": "npm run prepare && node bin/fake-corp-proxy.js",
-    "test:http": "http_proxy=\"http://username:password@localhost:8080\" curl http://cdn.touchify.co/docs/windows/index.html",
-    "test:https": "https_proxy=\"https://username:password@localhost:8080\" curl https://www.google.fr",
+    "test:http": "curl -x \"http://username:password@localhost:8080\" http://cdn.touchify.co/docs/windows/index.html",
+    "test:https": "curl --proxy-insecure -x \"https://username:password@localhost:8081\" https://www.google.com/",
     "prepublishOnly": "npm run prepare -- --declaration",
     "postversion": "git push && git push --tags"
   },
@@ -30,6 +31,7 @@
     "@types/express": "^4.17.1",
     "@types/http-proxy": "^1.17.0",
     "@types/yargs": "^13.0.2",
+    "rimraf": "^3.0.0",
     "ts-node-dev": "^1.0.0-pre.43",
     "typescript": "^3.6.3"
   }
