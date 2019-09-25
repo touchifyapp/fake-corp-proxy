@@ -1,4 +1,4 @@
-# fake-corp-proxy
+# fake-corp-proxy [![npm version](https://badge.fury.io/js/fake-corp-proxy.svg)](https://badge.fury.io/js/fake-corp-proxy)
 
 A [Node.js](https://nodejs.org) module and command-line utility to start a fake HTTP(S) Forwrard-Proxy server with Basic or NTLM fake authentication.
 
