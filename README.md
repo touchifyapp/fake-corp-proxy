@@ -57,6 +57,14 @@ server.close();
 
 *Note: The same options as CLI are available"
 
+## Proxy Auto-Configuration (PAC Script)
+
+This Proxy supports PAC Script generation:
+
+```bash
+curl http://localhost:8080/pac
+```
+
 ## Simulate Authentication errors
 
 This module does not really authenticate users.

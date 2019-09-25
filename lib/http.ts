@@ -19,8 +19,14 @@ export function initHttp(options: ProxyOptions, logger: Logger): http.Server {
 
         port = options.port || 8080;
 
+    app.get("/pac", (req, res) => {
+        res.header("Content-Type", "application/x-ns-proxy-autoconfig")
+            .send(createPacScript(port));
+    });
+
     if (options.ntlm) {
         logger.verbose("STARTUP> HTTP Proxy use NTLM authentication");
+
         app.use((req, res, next) => {
             handleNtlm(req, res, next, logger);
         });
@@ -28,15 +34,11 @@ export function initHttp(options: ProxyOptions, logger: Logger): http.Server {
 
     if (options.basic) {
         logger.verbose("STARTUP> HTTP Proxy use Basic authentication");
+
         app.use((req, res, next) => {
             handleBasic(req, res, next, logger);
         });
     }
-
-    // TODO: remove
-    app.connect("*", (req, res) => {
-        logger.verbose("EXPRESS> Connect handler");
-    });
 
     app.all("*", (req, res) => {
         logger.log(`PROXY>   ${new Date().toJSON()}\t${req.httpVersion}\t${req.method}\t${req.url}`);
@@ -59,4 +61,18 @@ export function initHttp(options: ProxyOptions, logger: Logger): http.Server {
     return http.createServer(app).listen(port, () => {
         logger.log(`STARTUP> HTTP Proxy listening on port ${port}...`);
     });
+}
+
+function createPacScript(port: number): string {
+    return `function FindProxyForURL(url, host) {
+    if (url.substring(0, 5) == "http:") {
+        return "PROXY localhost:${port}";
+    }
+    else if (url.substring(0, 6) == "https:") {
+        return "PROXY localhost:${port + 1}";
+    }
+    else {
+        return "DIRECT";
+    }
+}`;
 }

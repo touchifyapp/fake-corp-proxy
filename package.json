@@ -1,6 +1,6 @@
 {
   "name": "fake-corp-proxy",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "Fake proxy to test proxying in applications.",
   "repository": {
     "url": "https://github.com/touchifyapp/fake-corp-proxy.git",
