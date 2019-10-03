@@ -20,6 +20,8 @@ export function initHttp(options: ProxyOptions, logger: Logger): http.Server {
         port = options.port || 8080;
 
     app.get("/pac", (req, res) => {
+        logger.log(`PROXY>   ${new Date().toJSON()}\t${req.httpVersion}\t${req.method}\t${req.url}`);
+
         res.header("Content-Type", "application/x-ns-proxy-autoconfig")
             .send(createPacScript(port));
     });
