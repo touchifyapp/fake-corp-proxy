@@ -5,22 +5,27 @@ import {
     connect as connectSocket
 } from "net";
 
+import {
+    Readable,
+    Duplex
+} from "stream";
+
 export {
     Socket,
     SocketConnectOpts
 };
 
-export function writeResponse(socket: Socket, httpVersion: string, statusCode: number, headers?: Record<string, string>): Promise<void> {
-    return writeChunck(socket, `HTTP/${httpVersion} ${statusCode} ${getStatusMessage(statusCode)}\r\n${headers ? "" : "\r\n"}`)
-        .then(() => {
-            if (headers) {
-                const headersString = Object.keys(headers)
-                    .reduce((res, key) => res + `${key}: ${headers[key]}\r\n`, "");
+export async function writeResponse(socket: Socket, httpVersion: string, statusCode: number, headers?: Record<string, string>): Promise<void> {
+    await writeChunck(socket, `HTTP/${httpVersion} ${statusCode} ${getStatusMessage(statusCode)}\r\n${headers ? "" : "\r\n"}`);
 
-                return writeChunck(socket, headersString + "\r\n");
-            }
-        })
-        .then(() => end(socket));
+    if (headers) {
+        const headersString = Object.keys(headers)
+            .reduce((res, key) => res + `${key}: ${headers[key]}\r\n`, "");
+
+        await writeChunck(socket, headersString + "\r\n");
+    }
+
+    await end(socket);
 }
 
 export function writeChunck(socket: Socket, data: string, encoding = "utf-8"): Promise<void> {
@@ -45,10 +50,59 @@ export function connect(options: SocketConnectOpts): Promise<Socket> {
     });
 }
 
+export function startRead(socket: Socket, stream: Readable): Promise<void> {
+    return new Promise((resolve, reject) => {
+        let resolved = false;
+
+        socket.on("data", chunk => {
+            stream.push(chunk);
+            if (!resolved) {
+                resolved = true;
+                resolve();
+            }
+        });
+
+        socket.on("error", err => {
+            reject(err);
+        });
+
+        socket.on("end", () => {
+            stream.push(null);
+        });
+    });
+}
+
+export function read(socket: Socket, stream: Readable): Promise<void> {
+    return new Promise((resolve, reject) => {
+        socket.on("data", chunk => {
+            stream.push(chunk);
+        });
+
+        socket.on("error", err => {
+            reject(err);
+        });
+
+        socket.on("end", () => {
+            stream.push(null);
+            resolve();
+        });
+    });
+}
+
 export function pipe(srcSocket: Socket, destSocket: Socket): Promise<void> {
     return new Promise((resolve, reject) => {
         srcSocket.pipe(destSocket);
         destSocket.pipe(srcSocket);
+
+        destSocket.on("end", resolve);
+        destSocket.on("error", reject);
+    })
+}
+
+export function tunnel(srcSocket: Readable, tunnelSocket: Duplex, destSocket: NodeJS.WritableStream): Promise<void> {
+    return new Promise((resolve, reject) => {
+        srcSocket.pipe(tunnelSocket);
+        tunnelSocket.pipe(destSocket);
 
         destSocket.on("end", resolve);
         destSocket.on("error", reject);

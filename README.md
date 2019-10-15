@@ -1,6 +1,6 @@
 # fake-corp-proxy [![npm version](https://badge.fury.io/js/fake-corp-proxy.svg)](https://badge.fury.io/js/fake-corp-proxy)
 
-A [Node.js](https://nodejs.org) module and command-line utility to start a fake HTTP(S) Forwrard-Proxy server with Basic or NTLM fake authentication.
+A [Node.js](https://nodejs.org) module and command-line utility to start a fake HTTP(S) Forward-Proxy server with Basic or NTLM fake authentication.
 
 ## Installation
 
@@ -16,7 +16,7 @@ To use as a node.js module:
 npm install fake-corp-proxy
 ```
 
-## CLI usage
+## CLI HTTP usage
 
 Simple usage:
 
@@ -33,9 +33,29 @@ Options:
   --basic, -b        Enable Basic Authentication      [boolean] [default: false]
   --ntlm, -n         Enable NTLM Authentication       [boolean] [default: false]
   --https, -s        Enable HTTPS server              [boolean] [default: false]
-  --key, -k          Key for HTTPS server                               [string]
-  --cert, -c, --crt  Certificate for HTTPS server                       [string]
   -h, --help         Show help                                         [boolean]
+```
+
+## CLI HTTPS usage
+
+To make `fake-corp-proxy` to handle HTTPS protocol, you need to generate a CA certificate:
+
+```bash
+fake-corp-proxy-ca root my-ca-name
+```
+
+Then, you have to trust the generated certificate on your OS ([More infos](#trust-ca-certificate)).
+
+Once your CA certificate is trusted you can tunnel HTTPS requests to your proxy. You can also run the proxy in HTTPS mode.
+
+```bash
+fake-corp-proxy --https
+```
+
+If you forget where is stored you CA certificate, you can run:
+
+```bash
+fake-corp-proxy-ca root-path
 ```
 
 ## Module usage
@@ -77,40 +97,45 @@ curl --proxy-insecure -x \"https://unknown:password@localhost:8081\" https://www
 
 ## Exemples
 
-Forward-Proxy for HTTP only:
+Forward-Proxy in HTTP only:
 ```bash
 fake-corp-proxy
 ```
 
-Forward-Proxy for HTTP and HTTPS:
+Forward-Proxy with HTTP and HTTPS modes enabled:
 ```bash
-fake-corp-proxy --https --key certs/server.key --cert certs/server.crt
+fake-corp-proxy --https
 ```
 
-Forward-Proxy for HTTP and HTTPS with Basic authentication:
+Forward-Proxy with HTTP and HTTPS and Basic authentication:
 ```bash
-fake-corp-proxy --https --key certs/server.key --cert certs/server.crt --basic
+fake-corp-proxy --https --basic
 ```
 
-Forward-Proxy for HTTP and HTTPS with NTLM authentication:
+Forward-Proxy with HTTP and HTTPS and NTLM authentication:
 ```bash
-fake-corp-proxy --https --key certs/server.key --cert certs/server.crt --ntlm
+fake-corp-proxy --https --ntlm
 ```
 
-Forward-Proxy for HTTP and HTTPS with NTLM authentication and verbose logging (details of authentication):
+Forward-Proxy with HTTP and HTTPS and NTLM authentication and verbose logging (details of authentication):
 ```bash
-fake-corp-proxy --https --key certs/server.key --cert certs/server.crt --ntlm --verbose
+fake-corp-proxy --https --ntlm --verbose
 ```
 
-## Generate your SSL certificates
+## Trust CA certificate
 
-To generate self-signed certificates for your proxy, run:
+On Windows:
+1. Double-click on the certificate file
+2. Click on the `Install Certificate` button
+3. On opened window, select `Place all certificates in the following store`
+4. Click `Browse` then select `Trusted Root Certification Authorities` and click `OK`
 
-```bash
-openssl req -nodes -new -x509 -keyout server.key -out server.crt
-```
-
-Then you have to trust the server.crt in your OS to allow proxy validation.
+On OSX:
+1. Double-click on the certificate file
+2. Select `login` or `system` in the select box and click `Add`
+3. Open `Keychain` and find the newly imported certificate
+4. Double-click on the certificate
+5. Select `Always Trust` in the `When using this certificate` select box
 
 ## License
 

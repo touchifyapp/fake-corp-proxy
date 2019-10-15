@@ -33,18 +33,6 @@ const argv = yargs
         default: false
     })
 
-    .option("key", {
-        describe: "Key for HTTPS server",
-        alias: "k",
-        type: "string"
-    })
-
-    .option("cert", {
-        describe: "Certificate for HTTPS server",
-        alias: ["c", "crt"],
-        type: "string"
-    })
-
     .option("verbose", {
         describe: "Enable Verbose logging",
         alias: "v",

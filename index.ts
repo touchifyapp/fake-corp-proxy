@@ -1,22 +1,22 @@
 
-import { Logger } from "./lib/logger";
+import * as http from "http";
+import * as https from "https";
 
-import { initHttp } from "./lib/http";
-import { initTunnel } from "./lib/tunnel";
+import { Logger } from "./lib/logger";
+import { getCertificate } from "./lib/certificates";
+
+import { createProxyHandler } from "./lib/proxy";
+import { TunnelHandler, createTunnelHandler } from "./lib/tunnel";
 
 export interface ProxyOptions {
     /** Server port. */
-    port?: number;
+    port: number;
     /** Enable Basic Authentication. */
     basic?: boolean;
     /** Enable NTLM Authentication. */
     ntlm?: boolean;
     /** Enable HTTPS Server. */
     https?: boolean;
-    /** Key path for HTTPS server. */
-    key?: string;
-    /** Certificate path for HTTPS server */
-    cert?: string;
     /** Enable verbose logging. */
     verbose?: boolean;
     /** Silent any logs. */
@@ -27,7 +27,7 @@ export interface ProxyServer {
     close(): void;
 }
 
-export function start(options: ProxyOptions = {}): ProxyServer {
+export async function start(options: ProxyOptions = { port: 8080 }): Promise<ProxyServer> {
     if (options.ntlm && options.basic) {
         console.error("/!\\ Can't use both `ntlm` and `basic` authentications at the same time!");
         process.exit(1);
@@ -36,8 +36,11 @@ export function start(options: ProxyOptions = {}): ProxyServer {
     const
         logger = new Logger(options),
 
-        httpServer = initHttp(options, logger),
-        httpsServer = initTunnel(options, logger);
+        proxyHandler = createProxyHandler(options, logger),
+        tunnelHandler = createTunnelHandler(options, logger),
+
+        httpServer = createHttpServer(options, logger, proxyHandler, tunnelHandler),
+        httpsServer = options.https ? await createHttpsServer(options, logger, proxyHandler, tunnelHandler) : null;
 
     return {
         close() {
@@ -48,4 +51,28 @@ export function start(options: ProxyOptions = {}): ProxyServer {
             }
         }
     };
+}
+
+function createHttpServer(options: ProxyOptions, logger: Logger, proxyHandler: http.RequestListener, tunnelHandler: TunnelHandler): http.Server {
+    const server = http.createServer(proxyHandler).listen(options.port, () => {
+        logger.log(`STARTUP> HTTP Proxy listening on port ${options.port}...`);
+    });
+
+    server.on("connect", tunnelHandler);
+
+    return server;
+}
+
+async function createHttpsServer(options: ProxyOptions, logger: Logger, proxyHandler: http.RequestListener, tunnelHandler: TunnelHandler): Promise<https.Server> {
+    const
+        port = options.port + 1,
+        { keyContent, certContent } = await getCertificate("localhost");
+
+    const server = https.createServer({ key: keyContent, cert: certContent }, proxyHandler).listen(port, () => {
+        logger.log(`STARTUP> HTTPS Proxy listening on port ${port}...`);
+    });
+
+    server.on("connect", tunnelHandler);
+
+    return server;
 }

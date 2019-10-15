@@ -12,7 +12,7 @@ export function handleBasic(req: IncomingMessage, res: ResponseOrSocket, next: F
     const authHeader = req.headers["proxy-authorization"];
     if (!authHeader) {
         logger.verbose(`BASIC> Error 407: Got unauthenticated request: ${req.method} ${req.url}`);
-        return write(req, res, 407, { "Proxy-Authenticate": "Basic" }).then(() => false);
+        return write(req, res, 407, { "Proxy-Authenticate": `Basic realm="fake-corp-proxy"` }).then(() => false);
     }
 
     const authData = decodeBasicAuthorizationHeader(authHeader);

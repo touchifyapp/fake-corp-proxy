@@ -1,43 +1,35 @@
-import * as fs from "fs";
-import * as https from "https";
 import { IncomingMessage } from "http";
+import { Readable } from "stream";
 
 import { handleNtlm } from "./ntlm";
 import { handleBasic } from "./basic";
 
-import { ProxyOptions } from "..";
 import { Logger } from "./logger";
+import { ServerManager, ServerInfo } from "./mitm";
+import { createProxyHandler } from "./proxy";
 
 import {
     Socket,
-    SocketConnectOpts,
 
     writeChunck,
+    writeResponse,
     connect,
-    pipe
+    startRead,
+    tunnel
 } from "./socket";
 
 export type TunnelMiddleware = (req: IncomingMessage, clientSocket: Socket) => Promise<boolean>;
+export type TunnelHandler = (req: IncomingMessage, clientSocket: Socket) => any;
 
-export function initTunnel(options: ProxyOptions, logger: Logger): https.Server | undefined {
-    if (!options.https) {
-        return;
-    }
+export interface TunnelOptions {
+    basic?: boolean;
+    ntlm?: boolean;
+}
 
-    if (!options.key || !options.cert) {
-        console.error(`/!\\ WARN: A certificate file and a key file must be provided to start a HTTPS server!`);
-        process.exit(1);
-        return;
-    }
-
+export function createTunnelHandler(options: TunnelOptions, logger: Logger): TunnelHandler {
     const
-        middlewares: TunnelMiddleware[] = [],
-        port = options.port ? options.port + 1 : 8081,
-
-        opts: https.ServerOptions = {
-            key: fs.readFileSync(options.key),
-            cert: fs.readFileSync(options.cert)
-        };
+        mitm = new ServerManager(logger, createProxyHandler({ port: -1, noPac: true }, logger)),
+        middlewares: TunnelMiddleware[] = [];
 
     if (options.ntlm) {
         logger.verbose("STARTUP> HTTPS Tunnel use NTLM authentication");
@@ -49,51 +41,74 @@ export function initTunnel(options: ProxyOptions, logger: Logger): https.Server 
         middlewares.push((req, sock) => handleBasic(req, sock, noop, logger));
     }
 
-    const server = https.createServer(opts).listen(port, () => {
-        logger.log(`STARTUP> HTTPS Proxy listening on port ${port}...`);
-    });
-
-    server.on("connect", (req, clientSocket) => {
-        handleTunnel(req, clientSocket, middlewares.slice(), logger);
-    });
-
-    return server;
+    return (req, clientSocket) => {
+        handleTunnel(req, clientSocket, middlewares.slice(), mitm, logger);
+    };
 }
 
-function handleTunnel(req: IncomingMessage, clientSocket: Socket, middlewares: TunnelMiddleware[], logger: Logger): void {
-    executeMiddlewares(middlewares, req, clientSocket).then(res => {
-        if (!res) return;
+async function handleTunnel(req: IncomingMessage, clientSocket: Socket, middlewares: TunnelMiddleware[], mitm: ServerManager, logger: Logger): Promise<void> {
+    const ok = await executeMiddlewares(middlewares, req, clientSocket);
+    if (!ok) return;
 
-        logger.log(`TUNNEL>  ${new Date().toJSON()}\t${req.httpVersion}\t${req.method}\t${req.url}`);
+    logger.log(`TUNNEL>  ${new Date().toJSON()}\t${req.httpVersion}\t${req.method}\t${req.url}`);
 
-        return writeChunck(clientSocket, `HTTP/${req.httpVersion} 200 OK\r\n\r\n`)
-            .then(() => connect(getConnectOptions(req)))
-            .then(remoteSocket => pipe(clientSocket, remoteSocket))
-            .catch(err => {
-                logger.log("TUNNEL>  Error:", err);
-            });
-    });
+    const { host } = getServerInfo(req);
+
+    try {
+        await writeChunck(clientSocket, `HTTP/${req.httpVersion} 200 OK\r\n\r\n`);
+
+        const reqStrem = new CommonReadableStream();
+        await startRead(clientSocket, reqStrem);
+
+        const
+            internalServer = await mitm.getHttpsServer(host),
+            remoteSocket = await connect(internalServer);
+
+        await tunnel(reqStrem, remoteSocket, clientSocket);
+    }
+    catch (err) {
+        logger.log("TUNNEL>  Error:", err);
+
+        await writeResponse(clientSocket, "1.1", 502, {
+            "Proxy-Error": "true",
+            "Proxy-Error-Message": String(err),
+            "Content-Type": "text/html"
+        });
+    }
 }
 
-function executeMiddlewares(middlewares: TunnelMiddleware[], req: IncomingMessage, clientSocket: Socket): Promise<boolean> {
+async function executeMiddlewares(middlewares: TunnelMiddleware[], req: IncomingMessage, clientSocket: Socket): Promise<boolean> {
     const middleware = middlewares.shift();
 
     if (!middleware) {
-        return Promise.resolve(true);
+        return true;
     }
 
-    return middleware(req, clientSocket)
-        .then(res => {
-            if (!res) return res;
-            return executeMiddlewares(middlewares, req, clientSocket);
-        });
+    const ok = await middleware(req, clientSocket);
+    if (ok) {
+        return await executeMiddlewares(middlewares, req, clientSocket);
+    }
+
+    return false;
 }
 
-function getConnectOptions(req: IncomingMessage): SocketConnectOpts {
+function getServerInfo(req: IncomingMessage): ServerInfo {
     const [host, port] = req.url!.split(":");
     return { host, port: parseInt(port) };
 }
 
 function noop(): void {
     // void;
+}
+
+const DEFAULT_CHUNK_COLLECT_THRESHOLD = 20 * 1024 * 1024; // about 20 mb
+
+class CommonReadableStream extends Readable {
+    constructor() {
+        super({
+            highWaterMark: DEFAULT_CHUNK_COLLECT_THRESHOLD * 5
+        });
+    }
+
+    _read() { }
 }

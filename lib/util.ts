@@ -1,26 +1,34 @@
-import { Socket } from "net";
 import { IncomingMessage } from "http";
 import { Response } from "express";
 
-import * as socket from "./socket";
+import {
+    Socket,
+    writeResponse as writeToSocket
+} from "./socket";
 
-export { IncomingMessage };
+export { IncomingMessage, Socket };
 export type ResponseOrSocket = Response | Socket;
 
 export function write(req: IncomingMessage, res: ResponseOrSocket, statusCode: number, headers?: Record<string, string>): Promise<void> {
     return (res instanceof Socket) ?
-        socket.writeResponse(res, req.httpVersion, statusCode, headers) :
-        writeToResponse(req, res, statusCode, headers);
+        writeToSocket(res, req.httpVersion, statusCode, headers) :
+        writeToResponse(res, statusCode, headers);
 }
 
-function writeToResponse(req: IncomingMessage, res: Response, statusCode: number, headers?: Record<string, string>): Promise<void> {
-    return new Promise((resolve) => {
-        res.status(statusCode);
+function writeToResponse(res: Response, statusCode: number, headers?: Record<string, string>): Promise<void> {
+    return new Promise((resolve, reject) => {
+        try {
+            res.status(statusCode);
 
-        if (headers) {
-            Object.keys(headers).forEach(key => res.header(key, headers[key]));
+            if (headers) {
+                Object.keys(headers).forEach(key => res.header(key, headers[key]));
+            }
+
+            res.send();
+            resolve();
         }
-
-        res.send();
+        catch (err) {
+            reject(err);
+        }
     });
 }
